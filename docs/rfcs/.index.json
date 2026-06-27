@@ -1,0 +1,14 @@
+{
+  "rfcs": [
+    {
+      "number": "0001",
+      "title": "RFC-0001: Минималистичный редактор для фокусного редактирования",
+      "status": "review",
+      "dependencies": [],
+      "superseded_by": null,
+      "links": [],
+      "mtime": "1782556413",
+      "content_hash": null
+    }
+  ]
+}
