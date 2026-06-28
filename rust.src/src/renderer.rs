@@ -200,6 +200,36 @@ impl<W: Write> Renderer<W> {
 
         self.out.flush()
     }
+
+    /// Draws a full-screen overlay (help or settings) and flushes it.
+    ///
+    /// `content` lines are printed from the top (truncated to width); the last
+    /// row shows a reversed `footer`. The cursor stays hidden.
+    pub fn render_overlay(
+        &mut self,
+        width: u16,
+        height: u16,
+        content: &[String],
+        footer: &str,
+    ) -> io::Result<()> {
+        queue!(self.out, Hide)?;
+        let text_rows = height.saturating_sub(1) as usize;
+        for r in 0..text_rows {
+            queue!(self.out, MoveTo(0, r as u16), Clear(ClearType::CurrentLine))?;
+            if let Some(line) = content.get(r) {
+                self.print_line(line, width)?;
+            }
+        }
+        queue!(
+            self.out,
+            MoveTo(0, height.saturating_sub(1)),
+            Clear(ClearType::CurrentLine),
+            SetAttribute(Attribute::Reverse),
+            Print(fit_message(width as usize, footer)),
+            SetAttribute(Attribute::Reset)
+        )?;
+        self.out.flush()
+    }
 }
 
 #[cfg(test)]

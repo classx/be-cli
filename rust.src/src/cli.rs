@@ -46,13 +46,24 @@ pub enum Flow {
     Quit,
 }
 
+/// Active editor screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Edit,
+    Help,
+    Settings,
+}
+
 /// Editor state driving the main loop.
 pub struct Editor {
     doc: Document,
     lines_before: usize,
     lines_after: usize,
+    cursor_on_open: CursorOnOpen,
     message: Option<String>,
     pending_quit: bool,
+    mode: Mode,
+    settings_field: usize,
 }
 
 impl Editor {
@@ -74,8 +85,11 @@ impl Editor {
             doc,
             lines_before,
             lines_after,
+            cursor_on_open,
             message: None,
             pending_quit: false,
+            mode: Mode::Edit,
+            settings_field: 0,
         }
     }
 
@@ -117,6 +131,21 @@ impl Editor {
 
     /// Processes a single normalized input event.
     pub fn handle(&mut self, event: Event) -> Flow {
+        match self.mode {
+            Mode::Edit => self.handle_edit(event),
+            Mode::Help => {
+                self.handle_help(event);
+                Flow::Continue
+            }
+            Mode::Settings => {
+                self.handle_settings(event);
+                Flow::Continue
+            }
+        }
+    }
+
+    /// Handles input in the main editing mode.
+    fn handle_edit(&mut self, event: Event) -> Flow {
         // A non-quit event cancels a pending quit confirmation.
         if !matches!(event, Event::Action(Action::Quit)) {
             self.pending_quit = false;
@@ -139,9 +168,8 @@ impl Editor {
             }
             Event::Action(Action::Save) => self.save(),
             Event::Action(Action::Quit) => return self.quit(),
-            // Overlays (help/settings) are handled in a later phase.
-            Event::Action(Action::Help) => {}
-            Event::Action(Action::OpenSettings) => {}
+            Event::Action(Action::Help) => self.mode = Mode::Help,
+            Event::Action(Action::OpenSettings) => self.mode = Mode::Settings,
             Event::Escape => {}
             Event::Resize(_, _) => {}
             Event::Unknown => {}
@@ -149,8 +177,115 @@ impl Editor {
         Flow::Continue
     }
 
+    /// Handles input while the help overlay is open; Esc or `?` closes it.
+    fn handle_help(&mut self, event: Event) {
+        if matches!(event, Event::Escape | Event::Action(Action::Help)) {
+            self.mode = Mode::Edit;
+        }
+    }
+
+    /// Handles input in the settings panel.
+    ///
+    /// Up/Down select a field, Left/Right change it, Esc or Ctrl+O closes.
+    /// Changes apply to the current session only.
+    fn handle_settings(&mut self, event: Event) {
+        match event {
+            Event::Escape | Event::Action(Action::OpenSettings) => self.mode = Mode::Edit,
+            Event::Move(Direction::Up) => {
+                self.settings_field = self.settings_field.saturating_sub(1);
+            }
+            Event::Move(Direction::Down) => {
+                self.settings_field = (self.settings_field + 1).min(2);
+            }
+            Event::Move(Direction::Left) => self.adjust_setting(false),
+            Event::Move(Direction::Right) => self.adjust_setting(true),
+            _ => {}
+        }
+    }
+
+    /// Increments (`up`) or decrements the currently selected setting.
+    fn adjust_setting(&mut self, up: bool) {
+        match self.settings_field {
+            0 => {
+                self.lines_before = if up {
+                    self.lines_before + 1
+                } else {
+                    self.lines_before.saturating_sub(1)
+                };
+            }
+            1 => {
+                self.lines_after = if up {
+                    self.lines_after + 1
+                } else {
+                    self.lines_after.saturating_sub(1)
+                };
+            }
+            _ => {
+                self.cursor_on_open = match self.cursor_on_open {
+                    CursorOnOpen::Start => CursorOnOpen::End,
+                    CursorOnOpen::End => CursorOnOpen::Start,
+                };
+            }
+        }
+    }
+
+    /// Builds the help overlay content lines.
+    fn help_lines(&self) -> Vec<String> {
+        let mut lines = vec![
+            "be — help".to_string(),
+            String::new(),
+            "  Ctrl+S      Save".to_string(),
+            "  Ctrl+Q      Quit (confirm if unsaved)".to_string(),
+            "  Ctrl+O      Settings".to_string(),
+            "  ?           Toggle this help".to_string(),
+            "  Arrows      Move cursor".to_string(),
+            "  Enter       Insert line break".to_string(),
+            "  Backspace   Delete left".to_string(),
+            "  Delete      Delete right".to_string(),
+        ];
+        if self.doc.is_readonly() {
+            lines.push(String::new());
+            lines.push("  [readonly] viewing only".to_string());
+        }
+        lines
+    }
+
+    /// Builds the settings panel content lines, marking the selected field.
+    fn settings_lines(&self) -> Vec<String> {
+        let cursor = match self.cursor_on_open {
+            CursorOnOpen::Start => "start",
+            CursorOnOpen::End => "end",
+        };
+        let fields = [
+            format!("lines_before: {}", self.lines_before),
+            format!("lines_after: {}", self.lines_after),
+            format!("cursor_on_open: {cursor}"),
+        ];
+        let mut lines = vec!["be — settings".to_string(), String::new()];
+        for (i, field) in fields.iter().enumerate() {
+            let marker = if i == self.settings_field { ">" } else { " " };
+            lines.push(format!("{marker} {field}"));
+        }
+        lines
+    }
+
     /// Builds the current frame and draws it.
     fn render<W: Write>(&self, renderer: &mut Renderer<W>, width: u16, height: u16) -> io::Result<()> {
+        match self.mode {
+            Mode::Help => {
+                return renderer.render_overlay(width, height, &self.help_lines(), "Esc or ? to close");
+            }
+            Mode::Settings => {
+                return renderer.render_overlay(
+                    width,
+                    height,
+                    &self.settings_lines(),
+                    "Up/Down select · Left/Right change · Esc to close",
+                );
+            }
+            Mode::Edit => {}
+        }
+
         let cursor = self.doc.buffer().cursor();
         let content_height = height.saturating_sub(1) as usize;
         let layout = viewport::layout(
@@ -354,6 +489,77 @@ mod tests {
         let c = ed.doc.buffer().cursor();
         assert_eq!(c.line, 1);
         assert_eq!(c.col, 3);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn help_toggles_with_question_mark() {
+        let (mut ed, path) = editor_with("abc", false);
+        assert_eq!(ed.mode, Mode::Edit);
+        ed.handle(Event::Action(Action::Help));
+        assert_eq!(ed.mode, Mode::Help);
+        ed.handle(Event::Action(Action::Help));
+        assert_eq!(ed.mode, Mode::Edit);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn help_closes_on_escape_and_ignores_edits() {
+        let (mut ed, path) = editor_with("abc", false);
+        ed.handle(Event::Action(Action::Help));
+        ed.handle(Event::Insert('x'));
+        assert!(!ed.doc.buffer().is_modified());
+        ed.handle(Event::Escape);
+        assert_eq!(ed.mode, Mode::Edit);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn help_shows_readonly_marker() {
+        let (ed, path) = editor_with("abc", true);
+        let lines = ed.help_lines();
+        assert!(lines.iter().any(|l| l.contains("[readonly]")));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn settings_open_navigate_adjust_and_close() {
+        let (mut ed, path) = editor_with("abc", false);
+        ed.handle(Event::Action(Action::OpenSettings));
+        assert_eq!(ed.mode, Mode::Settings);
+        assert_eq!(ed.settings_field, 0);
+
+        // Increase lines_before on field 0.
+        ed.handle(Event::Move(Direction::Right));
+        assert_eq!(ed.lines_before, 4);
+        ed.handle(Event::Move(Direction::Left));
+        assert_eq!(ed.lines_before, 3);
+
+        // Move to field 1 and adjust lines_after.
+        ed.handle(Event::Move(Direction::Down));
+        assert_eq!(ed.settings_field, 1);
+        ed.handle(Event::Move(Direction::Right));
+        assert_eq!(ed.lines_after, 4);
+
+        // Move to field 2 and toggle cursor_on_open.
+        ed.handle(Event::Move(Direction::Down));
+        assert_eq!(ed.settings_field, 2);
+        assert_eq!(ed.cursor_on_open, CursorOnOpen::Start);
+        ed.handle(Event::Move(Direction::Right));
+        assert_eq!(ed.cursor_on_open, CursorOnOpen::End);
+
+        ed.handle(Event::Action(Action::OpenSettings));
+        assert_eq!(ed.mode, Mode::Edit);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn settings_lines_marks_selected_field() {
+        let (mut ed, path) = editor_with("abc", false);
+        ed.handle(Event::Action(Action::OpenSettings));
+        ed.handle(Event::Move(Direction::Down));
+        let lines = ed.settings_lines();
+        assert!(lines.iter().any(|l| l.starts_with("> lines_after")));
         let _ = fs::remove_file(path);
     }
 }
