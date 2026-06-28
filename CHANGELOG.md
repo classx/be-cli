@@ -14,6 +14,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
   with word wrap for long lines; adjustable from the settings panel and
   persisted to the config file.
 
+### Fixed
+
+- Saving no longer strips the file's trailing newline; the original
+  trailing-newline state is now preserved on save.
+
 ### Changed
 
 - Advanced RFC-0001..0008 to status `implemented`.

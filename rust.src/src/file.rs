@@ -103,6 +103,8 @@ pub struct Document {
     buffer: Buffer,
     path: PathBuf,
     readonly: ReadOnly,
+    /// Whether the on-disk file ended with a trailing newline; preserved on save.
+    trailing_newline: bool,
 }
 
 impl Document {
@@ -129,6 +131,7 @@ impl Document {
                 buffer: Buffer::new(""),
                 path,
                 readonly: ReadOnly::Writable,
+                trailing_newline: false,
             });
         }
 
@@ -146,6 +149,7 @@ impl Document {
         };
 
         Ok(Self {
+            trailing_newline: content.ends_with('\n'),
             buffer: Buffer::new(&content),
             path,
             readonly,
@@ -194,7 +198,11 @@ impl Document {
         if self.readonly.is_readonly() {
             return Err(SaveError::ReadOnly(self.readonly));
         }
-        fs::write(&self.path, self.buffer.to_text()).map_err(|source| SaveError::Io {
+        let mut text = self.buffer.to_text();
+        if self.trailing_newline {
+            text.push('\n');
+        }
+        fs::write(&self.path, text).map_err(|source| SaveError::Io {
             path: self.path.clone(),
             source,
         })?;
@@ -265,6 +273,27 @@ mod tests {
         doc.save().unwrap();
         assert!(!doc.buffer().is_modified());
         assert_eq!(fs::read_to_string(&path).unwrap(), "hi");
+        cleanup(&path);
+    }
+
+    #[test]
+    fn save_preserves_trailing_newline() {
+        let path = temp_path();
+        fs::write(&path, "alpha\nbeta\ngamma\n").unwrap();
+        let mut doc = Document::open(&path, false).unwrap();
+        doc.save().unwrap();
+        // The trailing newline must round-trip unchanged.
+        assert_eq!(fs::read_to_string(&path).unwrap(), "alpha\nbeta\ngamma\n");
+        cleanup(&path);
+    }
+
+    #[test]
+    fn save_keeps_absence_of_trailing_newline() {
+        let path = temp_path();
+        fs::write(&path, "alpha\nbeta").unwrap();
+        let mut doc = Document::open(&path, false).unwrap();
+        doc.save().unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "alpha\nbeta");
         cleanup(&path);
     }
 

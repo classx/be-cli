@@ -195,7 +195,11 @@ impl<W: Write> Renderer<W> {
             ResetColor
         )?;
 
-        let cursor_x = (margin + frame.screen.cursor_col.min(col_w.saturating_sub(1) as usize) as u16)
+        let cursor_x = (margin
+            + frame
+                .screen
+                .cursor_col
+                .min(col_w.saturating_sub(1) as usize) as u16)
             .min(frame.term_width.saturating_sub(1));
         let cursor_y = frame.screen.cursor_row as u16;
         queue!(self.out, MoveTo(cursor_x, cursor_y), Show)?;
