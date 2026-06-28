@@ -74,7 +74,7 @@ jobs:
           mkdir -p "${{ steps.archive.outputs.dir }}"
           cp "target/${{ matrix.target }}/release/${BINARY_NAME}" "${{ steps.archive.outputs.dir }}/"
           cp ../README.md "${{ steps.archive.outputs.dir }}/" 2>/dev/null || true
-          cp ../LICENSE "${{ steps.archive.outputs.dir }}/" 2>/dev/null || true
+          cp ../LICENSE-MIT ../LICENSE-APACHE "${{ steps.archive.outputs.dir }}/" 2>/dev/null || true
           cd _dist
           tar czf "${{ steps.archive.outputs.name }}.tar.gz" "${{ steps.archive.outputs.name }}"
 
