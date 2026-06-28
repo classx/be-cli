@@ -19,6 +19,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
   `lines_after`).
 - Ctrl+Home moves the cursor to the start of the file.
 - Ctrl+End moves the cursor to the end of the file.
+- `make install` target installing the optimized binary into
+  `~/.local/bin` (overridable via `INSTALL_DIR`).
 - The status line shows an `[autosave]` marker when autosave is enabled.
 - Settings changed in the Ctrl+O panel are now persisted to the config file
   when the panel is closed, instead of applying only to the current session.
