@@ -1,7 +1,10 @@
 # Makefile for the Rust implementation of `be` (rust.src).
 # All build and verification is funneled through these targets.
 
-.PHONY: all build run test lint fmt fmt-check clippy check clean release
+.PHONY: all build run test lint fmt fmt-check clippy check clean release install
+
+# Installation directory for the `be` binary.
+INSTALL_DIR ?= $(HOME)/.local/bin
 
 # Default: full verification.
 all: check
@@ -39,6 +42,12 @@ clippy:
 
 # Full gate before commit/merge: build + test + lint.
 check: build test lint
+
+# Install the optimized binary into INSTALL_DIR (default: ~/.local/bin).
+install: release
+	install -d $(INSTALL_DIR)
+	install -m 755 target/release/be $(INSTALL_DIR)/be
+	@echo "installed be to $(INSTALL_DIR)/be"
 
 # Remove build artifacts.
 clean:
