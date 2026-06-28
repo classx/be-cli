@@ -281,10 +281,20 @@ impl Editor {
     }
 
     /// Builds the current frame and draws it.
-    fn render<W: Write>(&self, renderer: &mut Renderer<W>, width: u16, height: u16) -> io::Result<()> {
+    fn render<W: Write>(
+        &self,
+        renderer: &mut Renderer<W>,
+        width: u16,
+        height: u16,
+    ) -> io::Result<()> {
         match self.mode {
             Mode::Help => {
-                return renderer.render_overlay(width, height, &self.help_lines(), "Esc or ? to close");
+                return renderer.render_overlay(
+                    width,
+                    height,
+                    &self.help_lines(),
+                    "Esc or ? to close",
+                );
             }
             Mode::Settings => {
                 return renderer.render_overlay(

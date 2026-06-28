@@ -52,7 +52,7 @@ impl Default for Config {
 
 impl Config {
     /// Serializes the config into the TOML form written to disk.
-    pub fn to_toml(&self) -> String {
+    pub fn to_toml(self) -> String {
         format!(
             "# be editor configuration\n\
              lines_before = {}\n\
@@ -161,14 +161,14 @@ pub fn load_or_create_at(path: &Path) -> (Config, Vec<String>) {
     } else {
         let config = Config::default();
         let mut warnings = Vec::new();
-        if let Some(parent) = path.parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                warnings.push(format!(
-                    "cannot create config dir '{}': {e}",
-                    parent.display()
-                ));
-                return (config, warnings);
-            }
+        if let Some(parent) = path.parent()
+            && let Err(e) = fs::create_dir_all(parent)
+        {
+            warnings.push(format!(
+                "cannot create config dir '{}': {e}",
+                parent.display()
+            ));
+            return (config, warnings);
         }
         if let Err(e) = fs::write(path, config.to_toml()) {
             warnings.push(format!("cannot write config '{}': {e}", path.display()));
