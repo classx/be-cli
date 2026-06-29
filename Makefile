@@ -1,4 +1,4 @@
-# Makefile for the Rust implementation of `be` (rust.src).
+# Makefile for the Rust implementation of `be`.
 # All build and verification is funneled through these targets.
 
 .PHONY: all build run test lint fmt fmt-check clippy check clean release install
