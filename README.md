@@ -6,7 +6,7 @@ A minimal Linux terminal editor focused on distraction-free writing and note-tak
 
 - RFC: `docs/rfcs/0001.md`
 - RFC status: `review`
-- Implementation language (current preference): `Hare` *(provisional; may return to Rust)*
+- Implementation language: `Rust`
 
 ## Product idea (MVP)
 
@@ -31,6 +31,7 @@ Post-MVP ideas include theme customization, custom keybindings, and full-file pr
 
 ## Repository structure
 
+- `src/` — Rust source code
 - `docs/rfcs/` — RFC documents and index
 - `AGENTS.md` — project workflow and agent rules
 

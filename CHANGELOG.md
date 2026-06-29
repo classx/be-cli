@@ -7,6 +7,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+### Changed
+
+- Flattened the `rust.src/` directory into the repository root and standardized
+  the project on Rust, dropping the Hare implementation. README, Makefile,
+  PLAN-0001, and GitHub Actions (CI/release) were updated to remove `rust.src`
+  paths and Hare references.
+
 ## [0.2.1] - 2026-06-29
 
 ### Fixed
